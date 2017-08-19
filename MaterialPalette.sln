@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MaterialPalette", "MaterialPalette.csproj", "{83ABCE8C-D26C-483F-AA5A-C73960036D3D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{83ABCE8C-D26C-483F-AA5A-C73960036D3D}.Debug|x64.ActiveCfg = Debug|x64
+		{83ABCE8C-D26C-483F-AA5A-C73960036D3D}.Debug|x64.Build.0 = Debug|x64
+		{83ABCE8C-D26C-483F-AA5A-C73960036D3D}.Debug|x86.ActiveCfg = Debug|x86
+		{83ABCE8C-D26C-483F-AA5A-C73960036D3D}.Debug|x86.Build.0 = Debug|x86
+		{83ABCE8C-D26C-483F-AA5A-C73960036D3D}.Release|x64.ActiveCfg = Release|x64
+		{83ABCE8C-D26C-483F-AA5A-C73960036D3D}.Release|x64.Build.0 = Release|x64
+		{83ABCE8C-D26C-483F-AA5A-C73960036D3D}.Release|x86.ActiveCfg = Release|x86
+		{83ABCE8C-D26C-483F-AA5A-C73960036D3D}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
