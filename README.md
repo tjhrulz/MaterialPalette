@@ -20,3 +20,7 @@ Implement color palette from image (Possibly with fallbacks to good color palett
 Add ability to crop image  
 Add desktop support if not done in 2.0  
 Extract icon color from exe  
+
+**For v3.0**
+Add functionallity similar to color thief to get N most commmon colors in image in no particular order and let app handle it
+Nested variables?
