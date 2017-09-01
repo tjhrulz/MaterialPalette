@@ -8,169 +8,6 @@ namespace MaterialPalette
 {
     class Swatch
     {
-        //For creating colors from HSB
-        public static Color FromHSB(float hue, float saturation, float brightness)
-        {
-
-            //Cap colors since this is not intended to be color safe
-            if (0f > hue)
-            {
-                hue = 0f;
-            }
-            else if (360f < hue)
-            {
-                hue = 360f;
-            }
-
-            if (0f > saturation)
-            {
-                saturation = 0f;
-            }
-            else if (1f < saturation)
-            {
-                saturation = 1f;
-            }
-
-            if (0f > brightness)
-            {
-                brightness = 0f;
-            }
-            else if (1f < brightness)
-            {
-                brightness = 1f;
-            }
-
-            if (0 == saturation)
-            {
-                return Color.FromArgb(
-                                    Convert.ToInt32(brightness * 255),
-                                    Convert.ToInt32(brightness * 255),
-                                    Convert.ToInt32(brightness * 255));
-            }
-
-            float fMax, fMid, fMin;
-            int iSextant, iMax, iMid, iMin;
-
-            if (0.5 < brightness)
-            {
-                fMax = brightness - (brightness * saturation) + saturation;
-                fMin = brightness + (brightness * saturation) - saturation;
-            }
-            else
-            {
-                fMax = brightness + (brightness * saturation);
-                fMin = brightness - (brightness * saturation);
-            }
-
-            iSextant = (int)Math.Floor(hue / 60f);
-            if (300f <= hue)
-            {
-                hue -= 360f;
-            }
-
-            hue /= 60f;
-            hue -= 2f * (float)Math.Floor(((iSextant + 1f) % 6f) / 2f);
-            if (0 == iSextant % 2)
-            {
-                fMid = (hue * (fMax - fMin)) + fMin;
-            }
-            else
-            {
-                fMid = fMin - (hue * (fMax - fMin));
-            }
-
-            iMax = Convert.ToInt32(fMax * 255);
-            iMid = Convert.ToInt32(fMid * 255);
-            iMin = Convert.ToInt32(fMin * 255);
-
-            switch (iSextant)
-            {
-                case 1:
-                    return Color.FromArgb(iMid, iMax, iMin);
-                case 2:
-                    return Color.FromArgb(iMin, iMax, iMid);
-                case 3:
-                    return Color.FromArgb(iMin, iMid, iMax);
-                case 4:
-                    return Color.FromArgb(iMid, iMin, iMax);
-                case 5:
-                    return Color.FromArgb(iMax, iMin, iMid);
-                default:
-                    return Color.FromArgb(iMax, iMid, iMin);
-            }
-        }
-
-        //Where addedColorr is your starting point at 0.0 amountOfBase and baseColor is the color a 1.0 amountOfBase
-        public static Color Blend(Color baseColor, Color addedColor, double amountOfBase)
-        {
-            byte r = (byte)((baseColor.R * amountOfBase) + addedColor.R * (1 - amountOfBase));
-            byte g = (byte)((baseColor.G * amountOfBase) + addedColor.G * (1 - amountOfBase));
-            byte b = (byte)((baseColor.B * amountOfBase) + addedColor.B * (1 - amountOfBase));
-            return Color.FromArgb(r, g, b);
-        }
-        public static Color MakeDarkBase(Color primaryColor, float minContrast)
-        {
-            //0x2FF6F00
-            Color darkColor = Color.FromArgb(
-                primaryColor.R * primaryColor.R / 255,
-                primaryColor.G * primaryColor.G / 255, 
-                primaryColor.B * primaryColor.B / 255);
-
-            float pHue = primaryColor.GetHue();
-            float pSat = primaryColor.GetSaturation();
-            float pBright = primaryColor.GetBrightness();
-
-            float dHue = darkColor.GetHue();
-            float dSat = darkColor.GetSaturation();
-            float dBright = darkColor.GetBrightness();
-
-            float diff = 
-                (primaryColor.GetHue() - darkColor.GetHue()) /360 +
-                (primaryColor.GetSaturation() - darkColor.GetSaturation()) +
-                (primaryColor.GetBrightness() - darkColor.GetBrightness());
-
-            if(diff < minContrast * 3)
-            {
-                //@TODO maybe split between bright and saturation if that fits in both?
-
-                //If whole min contrast can come from brightness do that 
-                if(dBright - minContrast > 0 && minContrast > 0.001)
-                {
-                    return FromHSB(dHue, dSat, dBright - minContrast);
-                }
-                else if(minContrast > 0.001)
-                {
-                    minContrast -= dBright;
-                    dBright = 0;
-                }
-
-                if (dSat - minContrast > 0 && minContrast > 0.001)
-                {
-                    return FromHSB(dHue, dSat - minContrast, dBright);
-                }
-
-                else if (minContrast > 0.001)
-                {
-                    minContrast -= dSat;
-                    dSat = 0;
-                }
-
-                if(dHue > 180.0)
-                {
-                    dHue += Math.Max(minContrast * 360, 180);
-                }
-                else if (minContrast > 0.001)
-                {
-                    dHue -= Math.Max(minContrast * 360, 180);
-                }
-
-                //Should never be hit unless minContrast is way too big or none
-                return FromHSB(dHue, dSat - minContrast, dBright);
-            }
-
-            return darkColor;
-        }
-
         public enum SwatchNames
         {
             Red,
@@ -217,6 +54,14 @@ namespace MaterialPalette
             A700
         }
 
+        public enum SwatchCompAltColors
+        {
+            C100,
+            C200,
+            C400,
+            C700
+        }
+
         public enum SwatchVariantColors
         {
             VDARK,
@@ -225,8 +70,244 @@ namespace MaterialPalette
 
         public class ColorSwatch
         {
+            //Helper functions
+
+            //Generate Color from HSL
+            public static Color FromHSL(double hue, double saturation, double luminance)
+            {
+                //Cap colors since this is not intended to be color safe
+                if (0 > hue)
+                {
+                    hue = 0;
+                }
+                else if (360 < hue)
+                {
+                    hue = 360;
+                }
+                if (0 > saturation)
+                {
+                    saturation = 0;
+                }
+                else if (1 < saturation)
+                {
+                    saturation = 1;
+                }
+
+                if (0 > luminance)
+                {
+                    luminance = 0;
+                }
+                else if (1 < luminance)
+                {
+                    luminance = 1;
+                }
+
+                if (0 == saturation)
+                {
+                    return Color.FromArgb(
+                                        Convert.ToInt32(luminance * 255),
+                                        Convert.ToInt32(luminance * 255),
+                                        Convert.ToInt32(luminance * 255));
+                }
+
+                double fMax, fMid, fMin;
+                int iSextant, iMax, iMid, iMin;
+
+                if (0.5 < luminance)
+                {
+                    fMax = luminance - (luminance * saturation) + saturation;
+                    fMin = luminance + (luminance * saturation) - saturation;
+                }
+                else
+                {
+                    fMax = luminance + (luminance * saturation);
+                    fMin = luminance - (luminance * saturation);
+                }
+
+                iSextant = (int)Math.Floor(hue / 60f);
+                if (300 <= hue)
+                {
+                    hue -= 360;
+                }
+
+                hue /= 60;
+                hue -= 2 * (double)Math.Floor(((iSextant + 1) % 6) / 2.0);
+                if (0 == iSextant % 2)
+                {
+                    fMid = (hue * (fMax - fMin)) + fMin;
+                }
+                else
+                {
+                    fMid = fMin - (hue * (fMax - fMin));
+                }
+
+                iMax = Convert.ToInt32(fMax * 255);
+                iMid = Convert.ToInt32(fMid * 255);
+                iMin = Convert.ToInt32(fMin * 255);
+
+                switch (iSextant)
+                {
+                    case 1:
+                        return Color.FromArgb(iMid, iMax, iMin);
+                    case 2:
+                        return Color.FromArgb(iMin, iMax, iMid);
+                    case 3:
+                        return Color.FromArgb(iMin, iMid, iMax);
+                    case 4:
+                        return Color.FromArgb(iMid, iMin, iMax);
+                    case 5:
+                        return Color.FromArgb(iMax, iMin, iMid);
+                    default:
+                        return Color.FromArgb(iMax, iMid, iMin);
+                }
+            }
+
+            //Where addedColorr is your starting point at 0.0 amountOfBase and baseColor is the color a 1.0 amountOfBase
+            public static Color Blend(Color baseColor, Color addedColor, double amountOfBase)
+            {
+                byte r = (byte)((baseColor.R * amountOfBase) + addedColor.R * (1 - amountOfBase));
+                byte g = (byte)((baseColor.G * amountOfBase) + addedColor.G * (1 - amountOfBase));
+                byte b = (byte)((baseColor.B * amountOfBase) + addedColor.B * (1 - amountOfBase));
+                return Color.FromArgb(r, g, b);
+            }
+
+            //Generate dark color that palette uses to generate P600 - P900
+            public static Color GetDarkFromBase(Color primaryColor, double minContrast)
+            {
+                Color darkColor = Color.FromArgb(
+                    primaryColor.R * primaryColor.R / 255,
+                    primaryColor.G * primaryColor.G / 255,
+                    primaryColor.B * primaryColor.B / 255);
+
+                for (int i = 0; i < 5 && GetContrastRatio(primaryColor, darkColor) < minContrast; i++)
+                {
+                    darkColor = Color.FromArgb(
+                        primaryColor.R * darkColor.R / 255,
+                        primaryColor.G * darkColor.G / 255,
+                        primaryColor.B * darkColor.B / 255);
+                }
+
+                return darkColor;
+            }
+
+            //Get luminance in sRGB color space
+            public static double GetRelativeLuminance(Color color)
+            {
+                double percentR = color.R / 255.0;
+                percentR = percentR < 0.03928 ? percentR / 12.92 : Math.Pow((percentR + 0.055) / 1.055, 2.4);
+                double percentG = color.G / 255.0;
+                percentG = percentG < 0.03928 ? percentG / 12.92 : Math.Pow((percentG + 0.055) / 1.055, 2.4);
+                double percentB = color.B / 255.0;
+                percentB = percentB < 0.03928 ? percentB / 12.92 : Math.Pow((percentB + 0.055) / 1.055, 2.4);
+
+                return 0.2126 * percentR + 0.7152 * percentG + 0.0722 * percentB;
+            }
+
+            //Get contrast in sRGB space between two colors
+            public static double GetContrastRatio(Color color1, Color color2)
+            {
+                double luminance1 = GetRelativeLuminance(color1) + 0.05;
+                double luminance2 = GetRelativeLuminance(color2) + 0.05;
+
+                return Math.Max(luminance1, luminance2) / Math.Min(luminance1, luminance2);
+            }
+
+            //Check if hue is warm
+            public static bool isWarmHue(double hue)
+            {
+                return 90 < hue && hue < 330 ? false : true;
+            }
+
+            //Get warmest hue between two hues
+            public static double getWarmestHue(double hue1, double hue2)
+            {
+                return Math.Abs(210 - hue1) > Math.Abs(210 - hue2) ? hue1 : hue2;
+            }
+            
+            //Generate P50 - P900 from P500, if matchPrimaryColor is false then it may be corrected to prevent color palette duplicates
+            public static Color[] GetPrimaryArray(Color primaryColor, bool matchPrimaryColor)
+            {
+                Color lightBase = Color.FromArgb(255, 255, 255);
+                Color darkBase = GetDarkFromBase(primaryColor, minContrast);
+
+                return new Color[] {
+                    primaryColor,                       //500
+                    Blend(primaryColor, lightBase, .12), //P50
+                    Blend(primaryColor, lightBase, .30), //P100
+                    Blend(primaryColor, lightBase, .50), //P200
+                    Blend(primaryColor, lightBase, .70), //P300
+                    Blend(primaryColor, lightBase, .85), //P400
+                    Blend(primaryColor, darkBase, .87),  //P600
+                    Blend(primaryColor, darkBase, .70),  //P700
+                    Blend(primaryColor, darkBase, .54),  //P800
+                    Blend(primaryColor, darkBase, .25),  //P900
+                };
+            }
+            
+            //Generate A100 - A700 from corresponding P500
+            public static Color[] GetAccentArray(Color primaryColor)
+            {
+                double tempSat = primaryColor.GetSaturation();
+                double tempLum = primaryColor.GetBrightness();
+                double tempHue = primaryColor.GetHue();
+
+                if (tempSat < 0.95)
+                {
+                    tempSat = 0.95;
+                }
+                if (tempLum > 0.7)
+                {
+                    tempLum = 0.7;
+                }
+                else if (tempLum < 0.55)
+                {
+                    tempLum = 0.55;
+                }
+
+                return new Color[]
+                {
+                    FromHSL(tempHue, tempSat, tempLum + 0.12 > 0.75 ? tempLum + 0.12 : 0.75),
+                    FromHSL(tempHue, tempSat, tempLum),
+                    FromHSL(tempHue, tempSat, 0.45 < tempLum - 0.12 && tempLum - 0.12 < 0.55 ? tempLum - 0.12 : 0.5),
+                    FromHSL(tempHue, tempSat, 0.42)
+                };
+            }
+
+            //Get recommended accent color to go with P500
+            public static Color GetAccentRecomendation(Color primaryColor)
+            {
+                double pHueL = (primaryColor.GetHue() + 120) % 360;
+                double pHueD = (primaryColor.GetHue() + 240) % 360;
+
+                double newHue;
+                if (isWarmHue(primaryColor.GetHue()))
+                {
+                    if (isWarmHue(pHueL) || isWarmHue(pHueD))
+                    {
+                        newHue = getWarmestHue(pHueL, pHueD);
+                    }
+                    else
+                    {
+                        newHue = getWarmestHue(pHueL, pHueD) == pHueL ? pHueD : pHueL;
+                    }
+                }
+                else if (!isWarmHue(pHueL) || !isWarmHue(pHueD))
+                {
+                    newHue = getWarmestHue(pHueL, pHueD) == pHueL ? pHueD : pHueL;
+                }
+                else
+                {
+                    newHue = getWarmestHue(pHueL, pHueD);
+                }
+
+                return FromHSL(newHue, 1, 0.62);
+            }
+
+
+            const double minContrast = 2.33;
             public readonly Color[] SwatchPrimaryColors;
             public readonly Color[] SwatchAltColors;
+            public readonly Color[] SwatchCompAltColors;
             public readonly Color[] SwatchVariantColors;
 
             //Fallback constructor for fails, makes every color black
@@ -253,15 +334,15 @@ namespace MaterialPalette
 
                 Color[] variantColors = { Color.FromArgb(hexP500), Color.FromArgb(hexP500) };
 
-                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2);
 
-                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2);
 
                 SwatchVariantColors = variantColors;
             }
@@ -277,15 +358,15 @@ namespace MaterialPalette
 
                 Color[] variantColors = { Color.FromArgb(hexP500), Color.FromArgb(hexP500) };
 
-                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2);
 
-                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2);
 
                 SwatchVariantColors = variantColors;
             }
@@ -294,48 +375,23 @@ namespace MaterialPalette
             public ColorSwatch(int hex, bool matchPrimaryColor)
             {
                 Color P500 = Color.FromArgb(hex);
-                Color lightBase = Color.FromArgb(255, 255, 255);
-                Color darkBase = MakeDarkBase(P500, 0.25f);
 
-                //var baseDark = $scope.multiply(tinycolor(hex).toRgb(), tinycolor(hex).toRgb());
-                //var baseTriad = tinycolor(hex).tetrad();
+                SwatchPrimaryColors = GetPrimaryArray(P500, matchPrimaryColor);
 
-                SwatchPrimaryColors = new Color[] {
-                    P500,                       //500
-                    Blend(P500, lightBase, .12), //P50
-                    Blend(P500, lightBase, .30), //P100
-                    Blend(P500, lightBase, .50), //P200
-                    Blend(P500, lightBase, .70), //P300
-                    Blend(P500, lightBase, .85), //P400
-                    Blend(P500, darkBase, .87),  //P600
-                    Blend(P500, darkBase, .70),  //P700
-                    Blend(P500, darkBase, .54),  //P800
-                    Blend(P500, darkBase, .25),  //P900
-                };
-
-                SwatchAltColors = new Color[] {
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(80).lighten(65), 'A100'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(80).lighten(55), 'A200'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(100).lighten(45), 'A400'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(100).lighten(40), 'A700')
-
-                    P500, //A100
-                    P500, //A200
-                    P500, //A400
-                    P500, //A700
-                };
+                SwatchAltColors = GetAccentArray(P500);
+                SwatchCompAltColors = GetAccentArray(GetAccentRecomendation(P500));
 
                 Color[] variantColors = { P500, P500 };
 
-                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2);
 
-                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2);
 
                 SwatchVariantColors = variantColors;
             }
@@ -344,47 +400,23 @@ namespace MaterialPalette
             public ColorSwatch(byte R, byte G, byte B, bool matchPrimaryColor)
             {
                 Color P500 = Color.FromArgb(R, G, B);
-                Color lightBase = Color.FromArgb(255, 255, 255);
-                Color darkBase = MakeDarkBase(P500, 0.25f);
-                //var baseDark = $scope.multiply(tinycolor(hex).toRgb(), tinycolor(hex).toRgb());
-                //var baseTriad = tinycolor(hex).tetrad();
 
-                SwatchPrimaryColors = new Color[] {
-                    P500,                       //500
-                    Blend(P500, lightBase, .12), //P50
-                    Blend(P500, lightBase, .30), //P100
-                    Blend(P500, lightBase, .50), //P200
-                    Blend(P500, lightBase, .70), //P300
-                    Blend(P500, lightBase, .85), //P400
-                    Blend(P500, darkBase, .87),  //P600
-                    Blend(P500, darkBase, .70),  //P700
-                    Blend(P500, darkBase, .54),  //P800
-                    Blend(P500, darkBase, .25),  //P900
-                };
+                SwatchPrimaryColors = GetPrimaryArray(P500, matchPrimaryColor);
 
-                SwatchAltColors = new Color[] {
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(80).lighten(65), 'A100'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(80).lighten(55), 'A200'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(100).lighten(45), 'A400'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(100).lighten(40), 'A700')
-
-                    P500, //A100
-                    P500, //A200
-                    P500, //A400
-                    P500, //A700
-                };
+                SwatchAltColors = GetAccentArray(P500);
+                SwatchCompAltColors = GetAccentArray(GetAccentRecomendation(P500));
 
                 Color[] variantColors = { P500, P500 };
 
-                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2);
 
-                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2);
 
                 SwatchVariantColors = variantColors;
             }
@@ -392,47 +424,22 @@ namespace MaterialPalette
             //Full swatch generation from just color, does not guarantee that hexp500 is the color you give unless matchPrimaryColor is true
             public ColorSwatch(Color P500, bool matchPrimaryColor)
             {
-                Color lightBase = Color.FromArgb(255, 255, 255);
-                Color darkBase = MakeDarkBase(P500, 0.25f);
-                //var baseDark = $scope.multiply(tinycolor(hex).toRgb(), tinycolor(hex).toRgb());
-                //var baseTriad = tinycolor(hex).tetrad();
+                SwatchPrimaryColors = GetPrimaryArray(P500, matchPrimaryColor);
 
-                SwatchPrimaryColors = new Color[] {
-                    P500,                       //500
-                    Blend(P500, lightBase, .12), //P50
-                    Blend(P500, lightBase, .30), //P100
-                    Blend(P500, lightBase, .50), //P200
-                    Blend(P500, lightBase, .70), //P300
-                    Blend(P500, lightBase, .85), //P400
-                    Blend(P500, darkBase, .87),  //P600
-                    Blend(P500, darkBase, .70),  //P700
-                    Blend(P500, darkBase, .54),  //P800
-                    Blend(P500, darkBase, .25),  //P900
-                };
-
-                SwatchAltColors = new Color[] {
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(80).lighten(65), 'A100'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(80).lighten(55), 'A200'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(100).lighten(45), 'A400'),
-                //getColorObject(tinycolor.mix(baseDark, baseTriad[4], 15).saturate(100).lighten(40), 'A700')
-
-                    P500, //A100
-                    P500, //A200
-                    P500, //A400
-                    P500, //A700
-                };
+                SwatchAltColors = GetAccentArray(P500);
+                SwatchCompAltColors = GetAccentArray(GetAccentRecomendation(P500));
 
                 Color[] variantColors = { P500, P500 };
 
-                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VDARK] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VDARK].GetBrightness() - 0.2);
 
-                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSB(
+                variantColors[(int)Swatch.SwatchVariantColors.VLIGHT] = FromHSL(
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetHue(),
                     variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetSaturation(),
-                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2f);
+                    variantColors[(int)Swatch.SwatchVariantColors.VLIGHT].GetBrightness() + 0.2);
 
                 SwatchVariantColors = variantColors;
             }
@@ -535,7 +542,8 @@ namespace MaterialPalette
         {
             Primary,
             Alt,
-            Variant
+            Variant,
+            Comp
         }
 
         public static string colorToRainmeterString(Color color)
@@ -633,7 +641,6 @@ namespace MaterialPalette
                         {
                         }
                     }
-                    //@TODO read color and autogen swatch
                 }
             }
             else if (typeString.Equals(MeasureTypes.Palette.ToString(), StringComparison.InvariantCultureIgnoreCase))
@@ -717,13 +724,14 @@ namespace MaterialPalette
                     String colorName = api.ReadString("Code", null).ToUpperInvariant();
 
                     //If color name does not have prefix assume Primary
-                    if(!colorName.StartsWith("P") && !colorName.StartsWith("A") && !colorName.StartsWith("V"))
+                    if(!colorName.StartsWith("P") && !colorName.StartsWith("A") && !colorName.StartsWith("C") && !colorName.StartsWith("V"))
                     {
                         colorName = "P" + colorName;
                     }
 
                     Swatch.SwatchPrimaryColors currPrimaryColor;
                     Swatch.SwatchAltColors currAltColor;
+                    Swatch.SwatchCompAltColors currCompColor;
                     Swatch.SwatchVariantColors currVariantColor;
 
                     //Check if it exists in the list of primary colors or secondaryColors
@@ -737,6 +745,11 @@ namespace MaterialPalette
                         myColorType = ColorTypes.Alt;
                         myColorLoc = (int)currAltColor;
                     }
+                    else if (Enum.TryParse<Swatch.SwatchCompAltColors>(colorName, out currCompColor))
+                    {
+                        myColorType = ColorTypes.Comp;
+                        myColorLoc = (int)currCompColor;
+                    }
                     else if (Enum.TryParse<Swatch.SwatchVariantColors>(colorName, out currVariantColor))
                     {
                         myColorType = ColorTypes.Variant;
@@ -746,7 +759,7 @@ namespace MaterialPalette
                 }
                 else if (myParent.type == MeasureTypes.Palette)
                 {
-                    //@TODO image Palette creation
+                    //@TODO image Palette reading
                 }
                 else
                 {
@@ -783,6 +796,10 @@ namespace MaterialPalette
                     else if (myColorType == ColorTypes.Alt)
                     {
                         return colorToRainmeterString(myParent.currSwatch.SwatchAltColors[myColorLoc]);
+                    }
+                    else if (myColorType == ColorTypes.Comp)
+                    {
+                        return colorToRainmeterString(myParent.currSwatch.SwatchCompAltColors[myColorLoc]);
                     }
                     else if (myColorType == ColorTypes.Variant)
                     {
