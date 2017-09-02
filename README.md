@@ -45,25 +45,25 @@ Swatches: Google's color swatches, can use the pregenerated ones or generate it 
 
 ### Tentative Roadmap:
 **For v1.0**  
-[x] Import the 13 Material design color palettes  
-[x] Implement autogeneration of a swatch based on any color  
-[x] Auto complimentary alt color picking  
-[ ] Light dark variants  
-[ ] Swatch color safety features  
-[ ] Implement safe text color generation  
+- [x] Import the 13 Material design color palettes  
+- [x] Implement autogeneration of a swatch based on any color  
+- [x] Auto complimentary alt color picking  
+- [ ] Light dark variants  
+- [ ] Swatch color safety features  
+- [ ] Implement safe text color generation  
 
 **For v1.5**   
-[ ] Implment color from image with average and most common color extraction which can then be used for swatch generation  
-[ ] Add ability to crop image  
+- [ ] Implment color from image with average and most common color extraction which can then be used for swatch generation  
+- [ ] Add ability to crop image  
 
 **For v2.0**  
-[ ] Implement color palette from image  
-[ ] Palette safety features  
+- [ ] Implement color palette from image  
+- [ ] Palette safety features  
 
 **For v2.5**  
-[ ] Get desktop wallpaper  
-[ ] Extract icon color from exe  
+- [ ] Get desktop wallpaper  
+- [ ] Extract icon color from exe  
 
-**For v3.0**
-Add functionallity similar to color thief to get N most commmon colors in image in no particular order and let app handle it
-Nested variables?
+**For v3.0**  
+- [ ] Add functionallity similar to color thief to get N most commmon colors in image in no particular order and let app handle it
+- [ ] Nested variables/better variable systems?
