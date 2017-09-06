@@ -36,6 +36,7 @@ Swatches: Google's color swatches, can use the pregenerated ones or generate it 
     <li>Safe text color - Will tell you what color to make your text that is on another color</li>
     <li>A very fast image blur possibly with image cropping</li>
     <li>Background wallpaper fetching</li>
+    <li>Fetch image of wallpaper engine/desktop wallpaper replacers</li>
     <li>Image from URL downloading?</li>
     <li>Image extraction from icon if that does not make it into TaskbarPlugin</li>
     <li>Ability to set windows theme color if that does not make it into TaskbarPlugin</li>
@@ -61,7 +62,7 @@ Swatches: Google's color swatches, can use the pregenerated ones or generate it 
 - [ ] Palette safety features  
 
 **For v2.5**  
-- [ ] Get desktop wallpaper  
+- [ ] Get desktop wallpaper (Possibly even from Wallpaper Engine?)  
 - [ ] Extract icon color from exe  
 
 **For v3.0**  
