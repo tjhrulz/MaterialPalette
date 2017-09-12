@@ -225,7 +225,7 @@ namespace MaterialPalette
             }
             
             //Generate P50 - P900 from P500, if matchPrimaryColor is false then it may be corrected to prevent color palette duplicates
-            public static Color[] GetPrimaryArray(Color primaryColor, bool matchPrimaryColor)
+            public static Color[] GetPrimaryArray(Color primaryColor)
             {
                 Color lightBase = Color.FromArgb(255, 255, 255);
                 Color darkBase = GetDarkFromBase(primaryColor, minContrast);
@@ -303,6 +303,7 @@ namespace MaterialPalette
                 return FromHSL(newHue, 1, 0.62);
             }
 
+            //Get if black or white is a better text color on background color
             public static Color GetSafeTextColor(Color background)
             {
                 Color black = Color.FromArgb(0, 0, 0);
@@ -312,6 +313,32 @@ namespace MaterialPalette
 
                 return blackContrast > whiteContrast ? black : white;
             }
+            //@TODO Maybe add a CheckIfSafeTextColor that checks if given text color is safe on given backaground
+
+            //Generate 
+            public static Color GenerateSafeP500(Color P500)
+            {
+                //I originally had a bunch of code here that blended colors and had this as an extra option
+                //But I found that Google's limits on brightness seems to give a large enough range that it was closer to the original color
+                    //then my approach but still kept it at a good enough contrast to not get dups and was much less CPU
+                double hue = P500.GetHue();
+                double sat = P500.GetSaturation();
+                //Lum of default P500 colors never seem to go much outside of 45 +-15 (I added a little extra for two colors that are just outside)
+                double lum = P500.GetBrightness();
+                if (lum >= 0.61)
+                {
+                    lum = 0.61;
+                }
+                else if (lum <= 0.29)
+                {
+                    lum = 0.29;
+                }
+
+                P500 = FromHSL(hue, sat, lum);
+
+                return P500;
+            }
+
 
             const double minContrast = 2.33;
             public readonly Color[] SwatchPrimaryColors;
@@ -379,13 +406,18 @@ namespace MaterialPalette
 
                 SwatchVariantColors = variantColors;
             }
-            
-            //Full swatch generation from just color, does not guarantee that hexp500 is the color you give unless matchPrimaryColor is true
-            public ColorSwatch(int hex, bool matchPrimaryColor)
+
+            //Full swatch generation from just color, does not guarantee that hexp500 is the color you give unless colorSafetyLevel is 0
+            //colorSafetyLevel 1 will make sure there is no duplicates, colorSafetyLevel 2 will only use the provided colors hue
+            public ColorSwatch(int hex, bool colorSafetyLevel)
             {
                 Color P500 = Color.FromArgb(hex);
+                if (colorSafetyLevel)
+                {
+                    P500 = GenerateSafeP500(P500);
+                }
 
-                SwatchPrimaryColors = GetPrimaryArray(P500, matchPrimaryColor);
+                SwatchPrimaryColors = GetPrimaryArray(P500);
 
                 SwatchAltColors = GetAccentArray(P500);
                 SwatchCompAltColors = GetAccentArray(GetAccentRecomendation(P500));
@@ -405,12 +437,17 @@ namespace MaterialPalette
                 SwatchVariantColors = variantColors;
             }
 
-            //Full swatch generation from just color, does not guarantee that hexp500 is the color you give unless matchPrimaryColor is true
-            public ColorSwatch(byte R, byte G, byte B, bool matchPrimaryColor)
+            //Full swatch generation from just color, does not guarantee that hexp500 is the color you give unless colorSafetyLevel is 0
+            //colorSafetyLevel 1 will make sure there is no duplicates, colorSafetyLevel 2 will only use the provided colors hue
+            public ColorSwatch(byte R, byte G, byte B, bool colorSafetyLevel)
             {
                 Color P500 = Color.FromArgb(R, G, B);
+                if (colorSafetyLevel)
+                {
+                    P500 = GenerateSafeP500(P500);
+                }
 
-                SwatchPrimaryColors = GetPrimaryArray(P500, matchPrimaryColor);
+                SwatchPrimaryColors = GetPrimaryArray(P500);
 
                 SwatchAltColors = GetAccentArray(P500);
                 SwatchCompAltColors = GetAccentArray(GetAccentRecomendation(P500));
@@ -430,10 +467,16 @@ namespace MaterialPalette
                 SwatchVariantColors = variantColors;
             }
 
-            //Full swatch generation from just color, does not guarantee that hexp500 is the color you give unless matchPrimaryColor is true
-            public ColorSwatch(Color P500, bool matchPrimaryColor)
+            //Full swatch generation from just color, does not guarantee that hexp500 is the color you give unless colorSafetyLevel is 0
+            //colorSafetyLevel 1 will make sure there is no duplicates, colorSafetyLevel 2 will only use the provided colors hue
+            public ColorSwatch(Color P500, bool colorSafetyLevel)
             {
-                SwatchPrimaryColors = GetPrimaryArray(P500, matchPrimaryColor);
+                if(colorSafetyLevel)
+                {
+                    P500 = GenerateSafeP500(P500);
+                }
+
+                SwatchPrimaryColors = GetPrimaryArray(P500);
 
                 SwatchAltColors = GetAccentArray(P500);
                 SwatchCompAltColors = GetAccentArray(GetAccentRecomendation(P500));
@@ -585,7 +628,7 @@ namespace MaterialPalette
         internal ParentMeasure(IntPtr rm)
         {
             ParentMeasures.Add(this);
-            rm = rm;
+            lastKnownRM = rm;
         }
 
         internal override void Dispose()
@@ -618,6 +661,9 @@ namespace MaterialPalette
                 type = MeasureTypes.Swatch;
 
                 //Replce spaces and underscores with blanks so it is easier for users
+                bool colorSafety = api.ReadInt("ColorSafe", 0) != 0 ? true : false;
+
+                //Replce spaces and underscores with blanks so it is easier for users
                 String color = api.ReadString("Color", null).Replace(" ", String.Empty).Replace("_", String.Empty);
                 Swatch.SwatchNames currSwatchName;
                 //If it is a color name known
@@ -633,7 +679,7 @@ namespace MaterialPalette
                         try
                         {
                             //Take just first 6 numbers from hexcode and skip #
-                            currSwatch = new Swatch.ColorSwatch(Convert.ToInt32(color.Substring(1, 6), 16), false);
+                            currSwatch = new Swatch.ColorSwatch(Convert.ToInt32(color.Substring(1, 6), 16), colorSafety);
                         }
                         catch (Exception e)
                         {
@@ -654,7 +700,7 @@ namespace MaterialPalette
 
                             try
                             {
-                                currSwatch = new Swatch.ColorSwatch(Convert.ToByte(colorArr[0]), Convert.ToByte(colorArr[1]), Convert.ToByte(colorArr[2]), false);
+                                currSwatch = new Swatch.ColorSwatch(Convert.ToByte(colorArr[0]), Convert.ToByte(colorArr[1]), Convert.ToByte(colorArr[2]), colorSafety);
                             }
                             catch (Exception e)
                             {
@@ -710,6 +756,7 @@ namespace MaterialPalette
         private ColorTypes myColorType = ColorTypes.Primary;
         private int myColorLoc = (int)Swatch.SwatchPrimaryColors.P500;
         private Rainmeter.API api;
+        private string parentName = "";
 
         internal ChildMeasure(IntPtr rm)
         {
@@ -725,27 +772,33 @@ namespace MaterialPalette
         internal override String GetSafeTextColor()
         {
             Color color = new Color();
-            //Get current measure's color and calculate for than
-            if (myColorType == ColorTypes.Primary && myParent.currSwatch.SwatchPrimaryColors.Length >= myColorLoc)
+            if(myParent == null)
             {
-                color = myParent.currSwatch.SwatchPrimaryColors[myColorLoc];
+                API.LogF(lastKnownRM, API.LogType.Error, "Parent="+ parentName + " was not found");
+                return null;
             }
-            else if (myColorType == ColorTypes.Alt && myParent.currSwatch.SwatchAltColors.Length >= myColorLoc)
-            {
-                color = myParent.currSwatch.SwatchAltColors[myColorLoc];
-            }
-            else if (myColorType == ColorTypes.Comp && myParent.currSwatch.SwatchCompAltColors.Length >= myColorLoc)
-            {
-                color = myParent.currSwatch.SwatchCompAltColors[myColorLoc];
-            }
-            else if (myColorType == ColorTypes.Variant && myParent.currSwatch.SwatchVariantColors.Length >= myColorLoc)
-            {
-                color = myParent.currSwatch.SwatchVariantColors[myColorLoc];
-            }
-            if (!color.IsEmpty)
+            else if (!color.IsEmpty)
             {
                 return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(color));
             }
+            //Get current measure's color and calculate for than
+            else if (myColorType == ColorTypes.Primary && myParent.currSwatch.SwatchPrimaryColors.Length >= myColorLoc)
+            {
+                return colorToRainmeterString(myParent.currSwatch.SwatchPrimaryColors[myColorLoc]);
+            }
+            else if (myColorType == ColorTypes.Alt && myParent.currSwatch.SwatchAltColors.Length >= myColorLoc)
+            {
+                return colorToRainmeterString(myParent.currSwatch.SwatchAltColors[myColorLoc]);
+            }
+            else if (myColorType == ColorTypes.Comp && myParent.currSwatch.SwatchCompAltColors.Length >= myColorLoc)
+            {
+                return colorToRainmeterString(myParent.currSwatch.SwatchCompAltColors[myColorLoc]);
+            }
+            else if (myColorType == ColorTypes.Variant && myParent.currSwatch.SwatchVariantColors.Length >= myColorLoc)
+            {
+                return colorToRainmeterString(myParent.currSwatch.SwatchVariantColors[myColorLoc]);
+            }
+
             return null;
         }
         internal override String GetSafeTextColor(Color input)
@@ -757,7 +810,7 @@ namespace MaterialPalette
         internal override void Reload(IntPtr rm, ref double maxValue)
         {
             api = new Rainmeter.API(rm);
-            String parentName = api.ReadString("Parent", "");
+            parentName = api.ReadString("Parent", "");
             IntPtr skin = api.GetSkin();
             lastKnownRM = rm;
 
@@ -958,16 +1011,28 @@ namespace MaterialPalette
                     Color input = Color.FromArgb(Convert.ToInt16(argv[0]), Convert.ToInt16(argv[1]), Convert.ToInt16(argv[2]));
 
                     retValue = measure.GetSafeTextColor(input);
+                    //If color returned was bad
+                    if(retValue == null)
+                    {
+                        return false;
+                    }
                     return true;
                 }
                 catch (Exception e)
                 {
-
+                    API.LogF(measure.lastKnownRM, API.LogType.Error, "Error converting provided GetSafeColor parameter to RGB");
+                    API.Log(API.LogType.Debug, "Exception:" + e.ToString());
                 }
             }
+            //@TODO add hexcode support
             else
             {
                 retValue = measure.GetSafeTextColor();
+                //If color returned was bad
+                if (retValue == null)
+                {
+                    return false;
+                }
                 return true;
             }
 
