@@ -303,6 +303,15 @@ namespace MaterialPalette
                 return FromHSL(newHue, 1, 0.62);
             }
 
+            public static Color GetSafeTextColor(Color background)
+            {
+                Color black = Color.FromArgb(0, 0, 0);
+                Color white = Color.FromArgb(255, 255, 255);
+                double blackContrast = GetContrastRatio(background, black);
+                double whiteContrast = GetContrastRatio(background, white);
+
+                return blackContrast > whiteContrast ? black : white;
+            }
 
             const double minContrast = 2.33;
             public readonly Color[] SwatchPrimaryColors;
@@ -546,16 +555,22 @@ namespace MaterialPalette
             Comp
         }
 
+        //Helper function to convert Color objects to RGB strings
         public static string colorToRainmeterString(Color color)
         {
             return color.R + "," + color.G + "," + color.B; ;
         }
 
+        //Function for calculating what text color is safe
+        internal abstract String GetSafeTextColor();
+        internal abstract String GetSafeTextColor(Color input);
+
         internal abstract void Dispose();
-        internal abstract void Reload(Rainmeter.API api, ref double maxValue);
-        internal abstract void ExecuteBang(String args);
+        internal abstract void Reload(IntPtr rm, ref double maxValue);
         internal abstract double Update();
         internal abstract String GetString();
+
+        internal IntPtr lastKnownRM;
     }
 
     internal class ParentMeasure : Measure
@@ -567,9 +582,10 @@ namespace MaterialPalette
         internal Swatch.ColorSwatch currSwatch;
         internal MeasureTypes type;
 
-        internal ParentMeasure()
+        internal ParentMeasure(IntPtr rm)
         {
             ParentMeasures.Add(this);
+            rm = rm;
         }
 
         internal override void Dispose()
@@ -577,11 +593,23 @@ namespace MaterialPalette
             ParentMeasures.Remove(this);
         }
 
-
-        internal override void Reload(Rainmeter.API api, ref double maxValue)
+        internal override String GetSafeTextColor()
         {
+            //Provide safe text color for p500
+            return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(currSwatch.SwatchPrimaryColors[0]));
+        }
+        internal override String GetSafeTextColor(Color input)
+        {
+            //Provide safe text color for p500
+            return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(input));
+        }
+
+        internal override void Reload(IntPtr rm, ref double maxValue)
+        {
+            Rainmeter.API api = new Rainmeter.API(rm);
             Name = api.GetMeasureName();
             Skin = api.GetSkin();
+            lastKnownRM = rm;
 
             string typeString = api.ReadString("Type", MeasureTypes.Swatch.ToString());
 
@@ -609,7 +637,7 @@ namespace MaterialPalette
                         }
                         catch (Exception e)
                         {
-                            API.Log(API.LogType.Error, "Error generating swatch from RGB color");
+                            API.LogF(rm, API.LogType.Error, "Error generating swatch from RGB color");
                             API.Log(API.LogType.Debug, "Exception:" + e.ToString());
 
                             //Fallback to all black
@@ -630,7 +658,7 @@ namespace MaterialPalette
                             }
                             catch (Exception e)
                             {
-                                API.Log(API.LogType.Error, "Error generating swatch from RGB color");
+                                API.LogF(rm, API.LogType.Error, "Error generating swatch from RGB color");
                                 API.Log(API.LogType.Debug, "Exception:" + e.ToString());
 
                                 //Fallback to all black
@@ -650,13 +678,8 @@ namespace MaterialPalette
             }
             else
             {
-                API.Log(API.LogType.Error, "MaterialPalette - Invalid parent type");
+                API.LogF(lastKnownRM, API.LogType.Error, "Type=" + typeString + " is not a recognized swatch or a valid color");
             }
-        }
-
-        internal override void ExecuteBang(String args)
-        {
-
         }
 
         internal override double Update()
@@ -686,10 +709,12 @@ namespace MaterialPalette
         //Default color swatch info
         private ColorTypes myColorType = ColorTypes.Primary;
         private int myColorLoc = (int)Swatch.SwatchPrimaryColors.P500;
+        private Rainmeter.API api;
 
-        internal ChildMeasure()
+        internal ChildMeasure(IntPtr rm)
         {
-
+            lastKnownRM = rm;
+            api = new Rainmeter.API(rm);
         }
 
         internal override void Dispose()
@@ -697,10 +722,44 @@ namespace MaterialPalette
 
         }
 
-        internal override void Reload(Rainmeter.API api, ref double maxValue)
+        internal override String GetSafeTextColor()
         {
+            Color color = new Color();
+            //Get current measure's color and calculate for than
+            if (myColorType == ColorTypes.Primary && myParent.currSwatch.SwatchPrimaryColors.Length >= myColorLoc)
+            {
+                color = myParent.currSwatch.SwatchPrimaryColors[myColorLoc];
+            }
+            else if (myColorType == ColorTypes.Alt && myParent.currSwatch.SwatchAltColors.Length >= myColorLoc)
+            {
+                color = myParent.currSwatch.SwatchAltColors[myColorLoc];
+            }
+            else if (myColorType == ColorTypes.Comp && myParent.currSwatch.SwatchCompAltColors.Length >= myColorLoc)
+            {
+                color = myParent.currSwatch.SwatchCompAltColors[myColorLoc];
+            }
+            else if (myColorType == ColorTypes.Variant && myParent.currSwatch.SwatchVariantColors.Length >= myColorLoc)
+            {
+                color = myParent.currSwatch.SwatchVariantColors[myColorLoc];
+            }
+            if (!color.IsEmpty)
+            {
+                return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(color));
+            }
+            return null;
+        }
+        internal override String GetSafeTextColor(Color input)
+        {
+            //Provide safe text color for p500
+            return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(input));
+        }
+
+        internal override void Reload(IntPtr rm, ref double maxValue)
+        {
+            api = new Rainmeter.API(rm);
             String parentName = api.ReadString("Parent", "");
             IntPtr skin = api.GetSkin();
+            lastKnownRM = rm;
 
             // Find parent using name AND the skin handle to be sure that it's the right one.
             myParent = null;
@@ -714,7 +773,7 @@ namespace MaterialPalette
 
             if (myParent == null)
             {
-                API.Log(API.LogType.Error, "ParentChild.dll: ParentName=" + parentName + " not valid");
+                API.LogF(lastKnownRM, API.LogType.Error, "ParentName=" + parentName + " not valid");
             }
             else
             {
@@ -755,61 +814,64 @@ namespace MaterialPalette
                         myColorType = ColorTypes.Variant;
                         myColorLoc = (int)currVariantColor;
                     }
+                    else
+                    {
+                        API.LogF(lastKnownRM, API.LogType.Error, "Code=" + colorName + " not valid");
+                    }
 
                 }
                 else if (myParent.type == MeasureTypes.Palette)
                 {
                     //@TODO image Palette reading
                 }
-                else
-                {
-                    API.Log(API.LogType.Error, "MaterialPalette - Invalid child type");
-                }
             }
-        }
-
-        internal override void ExecuteBang(String args)
-        {
-
         }
 
         internal override double Update()
         {
             if (myParent != null)
             {
-
+                
             }
             return 0.0;
         }
 
         internal override String GetString()
         {
-            if (myParent != null && myParent.currSwatch.SwatchPrimaryColors != null)
+            try
             {
-                if (myParent.type == MeasureTypes.Swatch)
+                if (myParent != null && myParent.currSwatch.SwatchPrimaryColors != null)
                 {
-                    //A little messy but I wanted two seperate arrays
-                    if (myColorType == ColorTypes.Primary)
+                    if (myParent.type == MeasureTypes.Swatch)
                     {
-                        return colorToRainmeterString(myParent.currSwatch.SwatchPrimaryColors[myColorLoc]);
+                        //A little messy but I wanted two seperate arrays
+                        if (myColorType == ColorTypes.Primary)
+                        {
+                            return colorToRainmeterString(myParent.currSwatch.SwatchPrimaryColors[myColorLoc]);
+                        }
+                        else if (myColorType == ColorTypes.Alt)
+                        {
+                            return colorToRainmeterString(myParent.currSwatch.SwatchAltColors[myColorLoc]);
+                        }
+                        else if (myColorType == ColorTypes.Comp)
+                        {
+                            return colorToRainmeterString(myParent.currSwatch.SwatchCompAltColors[myColorLoc]);
+                        }
+                        else if (myColorType == ColorTypes.Variant)
+                        {
+                            return colorToRainmeterString(myParent.currSwatch.SwatchVariantColors[myColorLoc]);
+                        }
                     }
-                    else if (myColorType == ColorTypes.Alt)
+                    else if (myParent.type == MeasureTypes.Palette)
                     {
-                        return colorToRainmeterString(myParent.currSwatch.SwatchAltColors[myColorLoc]);
-                    }
-                    else if (myColorType == ColorTypes.Comp)
-                    {
-                        return colorToRainmeterString(myParent.currSwatch.SwatchCompAltColors[myColorLoc]);
-                    }
-                    else if (myColorType == ColorTypes.Variant)
-                    {
-                        return colorToRainmeterString(myParent.currSwatch.SwatchVariantColors[myColorLoc]);
+                        return "Unimplemented";
                     }
                 }
-                else if (myParent.type == MeasureTypes.Palette)
-                {
-                    return "Unimplemented";
-                }
+            }
+            catch (Exception e)
+            {
+                API.LogF(lastKnownRM, API.LogType.Error, "Unable to get color from parent");
+                API.Log(API.LogType.Debug, "Exception:" + e.ToString());
             }
             return null;
         }
@@ -828,11 +890,11 @@ namespace MaterialPalette
             Measure measure;
             if (String.IsNullOrEmpty(parent))
             {
-                measure = new ParentMeasure();
+                measure = new ParentMeasure(rm);
             }
             else
             {
-                measure = new ChildMeasure();
+                measure = new ChildMeasure(rm);
             }
 
             data = GCHandle.ToIntPtr(GCHandle.Alloc(measure));
@@ -854,7 +916,7 @@ namespace MaterialPalette
         public static void Reload(IntPtr data, IntPtr rm, ref double maxValue)
         {
             Measure measure = (Measure)GCHandle.FromIntPtr(data).Target;
-            measure.Reload(new Rainmeter.API(rm), ref maxValue);
+            measure.Reload(rm, ref maxValue);
         }
 
         [DllExport]
@@ -882,11 +944,35 @@ namespace MaterialPalette
 
             return StringBuffer;
         }
+
         [DllExport]
-        public static void ExecuteBang(IntPtr data, IntPtr args)
+        public static bool GetSafeColor(IntPtr data, [MarshalAs(UnmanagedType.LPWStr)] out string retValue, int argc, 
+            [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPWStr, SizeParamIndex = 2)] string[] argv)
         {
             Measure measure = (Measure)GCHandle.FromIntPtr(data).Target;
-            measure.ExecuteBang(Marshal.PtrToStringUni(args));
+            
+            if (argc >= 3)
+            {
+                try
+                {
+                    Color input = Color.FromArgb(Convert.ToInt16(argv[0]), Convert.ToInt16(argv[1]), Convert.ToInt16(argv[2]));
+
+                    retValue = measure.GetSafeTextColor(input);
+                    return true;
+                }
+                catch (Exception e)
+                {
+
+                }
+            }
+            else
+            {
+                retValue = measure.GetSafeTextColor();
+                return true;
+            }
+
+            retValue = "";
+            return false;
         }
     }
 }
