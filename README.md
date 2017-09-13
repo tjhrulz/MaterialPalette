@@ -37,6 +37,7 @@ Swatches: Google's color swatches, can use the pregenerated ones or generate it 
     <li>A very fast image blur possibly with image cropping</li>
     <li>Background wallpaper fetching</li>
     <li>Fetch image of wallpaper engine/desktop wallpaper replacers</li>
+    <li>Ability to watch image for changes and auto update all image stuff as needed with an onFinished bang</li>
     <li>Image from URL downloading?</li>
     <li>Image extraction from icon if that does not make it into TaskbarPlugin</li>
     <li>Ability to set windows theme color if that does not make it into TaskbarPlugin</li>
