@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Rainmeter;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 
 namespace MaterialPalette
 {
@@ -223,7 +224,7 @@ namespace MaterialPalette
             {
                 return Math.Abs(210 - hue1) > Math.Abs(210 - hue2) ? hue1 : hue2;
             }
-            
+
             //Generate P50 - P900 from P500, if matchPrimaryColor is false then it may be corrected to prevent color palette duplicates
             public static Color[] GetPrimaryArray(Color primaryColor)
             {
@@ -243,7 +244,7 @@ namespace MaterialPalette
                     Blend(primaryColor, darkBase, .25),  //P900
                 };
             }
-            
+
             //Generate A100 - A700 from corresponding P500
             public static Color[] GetAccentArray(Color primaryColor)
             {
@@ -315,12 +316,13 @@ namespace MaterialPalette
             }
             //@TODO Maybe add a CheckIfSafeTextColor that checks if given text color is safe on given backaground
 
-            //Generate 
+            //Generate safe P500 that ensures that you will get no duplicate colors 
+            //@TODO This actually has some issues with colors that are super saturated and should be tweaked (Maybe add back the darkness check)
             public static Color GenerateSafeP500(Color P500)
             {
                 //I originally had a bunch of code here that blended colors and had this as an extra option
                 //But I found that Google's limits on brightness seems to give a large enough range that it was closer to the original color
-                    //then my approach but still kept it at a good enough contrast to not get dups and was much less CPU
+                //then my approach but still kept it at a good enough contrast to not get dups and was much less CPU
                 double hue = P500.GetHue();
                 double sat = P500.GetSaturation();
                 //Lum of default P500 colors never seem to go much outside of 45 +-15 (I added a little extra for two colors that are just outside)
@@ -339,6 +341,66 @@ namespace MaterialPalette
                 return P500;
             }
 
+            public static Color GetAverageColorFromImage(String path)
+            {
+                Bitmap img = (Bitmap)Bitmap.FromFile(path);
+
+                int r = 0;
+                int g = 0;
+                int b = 0;
+                for (int h = 0; h < img.Height; h++)
+                {
+                    for (int w = 0; w < img.Width; w++)
+                    {
+                        Color pixel = img.GetPixel(w, h);
+
+                        r += pixel.R;
+                        g += pixel.G;
+                        b += pixel.B;
+                    }
+                }
+
+                return Color.FromArgb(r / (img.Height * img.Width), g / (img.Height * img.Width), b / (img.Height * img.Width));
+            }
+
+            public static Color GetMostCommonColorFromImage(String path)
+            {
+                Bitmap img = (Bitmap)Bitmap.FromFile(path);
+
+                Dictionary<Color, int> pixelFreq = new Dictionary<Color, int>();
+                for (int h = 0; h < img.Height; h++)
+                {
+                    for (int w = 0; w < img.Width; w++)
+                    {
+                        Color pixel = img.GetPixel(w, h);
+
+                        int value = 0;
+                        if (pixelFreq.TryGetValue(pixel, out value))
+                        {
+                            pixelFreq[pixel] = ++value;
+                        }
+                        else
+                        {
+                            //Add Hue to dictionary with 1 instance of that hue
+                            pixelFreq.Add(pixel, ++value);
+                        }
+                    }
+                }
+
+                return pixelFreq.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
+            }
+
+            //@TODO open up quality level to skins
+            public static Color GetDominateColorFromImage(String path)
+            {
+                Bitmap img = (Bitmap)Bitmap.FromFile(path);
+
+                ColorThiefDotNet.ColorThief colorThief = new ColorThiefDotNet.ColorThief();
+
+                //Color thief port to C# get dominate color is bugged but I am to lazy to fix and rebuild it, so I worked around it
+                var color = colorThief.GetPalette(img, 6, 10, false)[0].Color;
+                return Color.FromArgb(color.R, color.G, color.B);
+            }
 
             const double minContrast = 2.33;
             public readonly Color[] SwatchPrimaryColors;
@@ -661,25 +723,43 @@ namespace MaterialPalette
                 type = MeasureTypes.Swatch;
 
                 //Replce spaces and underscores with blanks so it is easier for users
-                bool colorSafety = api.ReadInt("ColorSafe", 0) != 0 ? true : false;
+                bool colorSafety = api.ReadInt("ColorSafe", 1) != 0 ? true : false;
 
                 //Replce spaces and underscores with blanks so it is easier for users
-                String color = api.ReadString("Color", null).Replace(" ", String.Empty).Replace("_", String.Empty);
+                String source = api.ReadString("Source", null).Replace(" ", String.Empty).Replace("_", String.Empty);
+                String sourcePath = api.ReadPath("Source", "");
+
                 Swatch.SwatchNames currSwatchName;
                 //If it is a color name known
-                if (Enum.TryParse<Swatch.SwatchNames>(color, out currSwatchName))
+                if (Enum.TryParse<Swatch.SwatchNames>(source, out currSwatchName))
                 {
                     currSwatch = Swatch.ColorSwatches[(int)currSwatchName];
                 }
                 else
                 {
+                    //If valid image path
+                    if (sourcePath.Length > 0 && System.IO.Directory.Exists(sourcePath.Substring(0, sourcePath.LastIndexOf('\\'))))
+                    {
+                        try
+                        {
+                            currSwatch = new Swatch.ColorSwatch(Swatch.ColorSwatch.GetDominateColorFromImage(sourcePath), colorSafety);
+                        }
+                        catch (Exception e)
+                        {
+                            API.LogF(rm, API.LogType.Error, "Error generating swatch from file");
+                            API.Log(API.LogType.Debug, "Exception:" + e.ToString());
+
+                            //Fallback to all black
+                            currSwatch = new Swatch.ColorSwatch();
+                        }
+                }
                     //If hex code
-                    if(color.Contains("#") || !color.Contains(","))
+                    else if (source.Contains("#") || !source.Contains(","))
                     {
                         try
                         {
                             //Take just first 6 numbers from hexcode and skip #
-                            currSwatch = new Swatch.ColorSwatch(Convert.ToInt32(color.Substring(1, 6), 16), colorSafety);
+                            currSwatch = new Swatch.ColorSwatch(Convert.ToInt32(source.Substring(1, 6), 16), colorSafety);
                         }
                         catch (Exception e)
                         {
@@ -690,11 +770,11 @@ namespace MaterialPalette
                             currSwatch = new Swatch.ColorSwatch();
                         }
                     }
-                    //If comma seperated RGB
                     else
                     {
-                        String[] colorArr = color.Split(',');
-                        if(colorArr.Length >= 3)
+                        String[] colorArr = source.Split(',');
+                        //If comma seperated RGB
+                        if (colorArr.Length >= 3)
                         {
                             //@TODO Possibly accept HSB & HSL out of the box especially with plans to implement that in the future into rainmeter
 
@@ -710,9 +790,6 @@ namespace MaterialPalette
                                 //Fallback to all black
                                 currSwatch = new Swatch.ColorSwatch();
                             }
-                        }
-                        else
-                        {
                         }
                     }
                 }
@@ -784,19 +861,19 @@ namespace MaterialPalette
             //Get current measure's color and calculate for than
             else if (myColorType == ColorTypes.Primary && myParent.currSwatch.SwatchPrimaryColors.Length >= myColorLoc)
             {
-                return colorToRainmeterString(myParent.currSwatch.SwatchPrimaryColors[myColorLoc]);
+                return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(myParent.currSwatch.SwatchPrimaryColors[myColorLoc]));
             }
             else if (myColorType == ColorTypes.Alt && myParent.currSwatch.SwatchAltColors.Length >= myColorLoc)
             {
-                return colorToRainmeterString(myParent.currSwatch.SwatchAltColors[myColorLoc]);
+                return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(myParent.currSwatch.SwatchAltColors[myColorLoc]));
             }
             else if (myColorType == ColorTypes.Comp && myParent.currSwatch.SwatchCompAltColors.Length >= myColorLoc)
             {
-                return colorToRainmeterString(myParent.currSwatch.SwatchCompAltColors[myColorLoc]);
+                return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(myParent.currSwatch.SwatchCompAltColors[myColorLoc]));
             }
             else if (myColorType == ColorTypes.Variant && myParent.currSwatch.SwatchVariantColors.Length >= myColorLoc)
             {
-                return colorToRainmeterString(myParent.currSwatch.SwatchVariantColors[myColorLoc]);
+                return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(myParent.currSwatch.SwatchVariantColors[myColorLoc]));
             }
 
             return null;
