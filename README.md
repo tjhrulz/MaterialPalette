@@ -12,7 +12,7 @@ Swatches: Google's color swatches, can use the pregenerated ones or generate it 
   Colors:
   <ul>
     <li>Primary and alt color sets based on a primary color (P50-P900 & A100 - A700)
-    <ul><li>Primary color can be adjusted to ensure no duplicates or to ensure a color spread similar to Google's</li></ul></li>
+    <ul><li>Primary color can optionally be adjusted to ensure no duplicate colors</li></ul></li>
     <li>Light variant and Dark variant based on primary color</li>
     <li>Suggested alt color set made to go well with your primary color set (C100 - C700)
         <ul><li>If generating from most common color in an image alt can be based on the image instead of primary color</li></ul></li>
@@ -30,16 +30,18 @@ Swatches: Google's color swatches, can use the pregenerated ones or generate it 
   </dd>
   
   
-  <dt>Other goodies</dt>
+  <dt>Other goodies and possibilities</dt>
   <dd>In order of likelyhood 
   <ul>
     <li>Safe text color - Will tell you what color to make your text that is on another color</li>
     <li>A very fast image blur possibly with image cropping</li>
     <li>Background wallpaper fetching</li>
     <li>Fetch image of wallpaper engine/desktop wallpaper replacers</li>
+    <li>Ability to watch image for changes and auto update all image stuff as needed with an onFinished bang</li>
     <li>Image from URL downloading?</li>
     <li>Image extraction from icon if that does not make it into TaskbarPlugin</li>
     <li>Ability to set windows theme color if that does not make it into TaskbarPlugin</li>
+    <li>Palette may get a a constructor from a single color depending on how good its color safe system ends up</li>
   </ul>  
   </dd>
 </dl>
@@ -49,9 +51,9 @@ Swatches: Google's color swatches, can use the pregenerated ones or generate it 
 - [x] Import the 13 Material design color palettes  
 - [x] Implement autogeneration of a swatch based on any color  
 - [x] Auto complimentary alt color picking  
-- [ ] Light dark variants  
-- [ ] Swatch color safety features  
-- [ ] Implement safe text color generation  
+- [ ] Light dark variants   
+- [x] Swatch color safety features  
+- [x] Implement safe text color generation  
 
 **For v1.5**   
 - [ ] Implment color from image with average and most common color extraction which can then be used for swatch generation  
