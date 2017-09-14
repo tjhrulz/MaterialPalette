@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using Rainmeter;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
+using System.IO;
 
 namespace MaterialPalette
 {
@@ -341,66 +341,56 @@ namespace MaterialPalette
                 return P500;
             }
 
-            public static Color GetAverageColorFromImage(String path)
+            
+            public static Color GetDominateColorFromImageColorThief(Bitmap img, int accuracy)
             {
-                Bitmap img = (Bitmap)Bitmap.FromFile(path);
-
-                int r = 0;
-                int g = 0;
-                int b = 0;
-                for (int h = 0; h < img.Height; h++)
-                {
-                    for (int w = 0; w < img.Width; w++)
-                    {
-                        Color pixel = img.GetPixel(w, h);
-
-                        r += pixel.R;
-                        g += pixel.G;
-                        b += pixel.B;
-                    }
-                }
-
-                return Color.FromArgb(r / (img.Height * img.Width), g / (img.Height * img.Width), b / (img.Height * img.Width));
-            }
-
-            public static Color GetMostCommonColorFromImage(String path)
-            {
-                Bitmap img = (Bitmap)Bitmap.FromFile(path);
-
-                Dictionary<Color, int> pixelFreq = new Dictionary<Color, int>();
-                for (int h = 0; h < img.Height; h++)
-                {
-                    for (int w = 0; w < img.Width; w++)
-                    {
-                        Color pixel = img.GetPixel(w, h);
-
-                        int value = 0;
-                        if (pixelFreq.TryGetValue(pixel, out value))
-                        {
-                            pixelFreq[pixel] = ++value;
-                        }
-                        else
-                        {
-                            //Add Hue to dictionary with 1 instance of that hue
-                            pixelFreq.Add(pixel, ++value);
-                        }
-                    }
-                }
-
-                return pixelFreq.Aggregate((l, r) => l.Value > r.Value ? l : r).Key;
-            }
-
-            //@TODO open up quality level to skins
-            public static Color GetDominateColorFromImage(String path)
-            {
-                Bitmap img = (Bitmap)Bitmap.FromFile(path);
-
                 ColorThiefDotNet.ColorThief colorThief = new ColorThiefDotNet.ColorThief();
 
-                //Color thief port to C# get dominate color is bugged but I am to lazy to fix and rebuild it, so I worked around it
-                var color = colorThief.GetPalette(img, 6, 10, false)[0].Color;
+                //Color thief port to C# had some issues (And random stupid changes) so I fixed them
+                var color = colorThief.GetColor(img, accuracy, true).Color;
                 return Color.FromArgb(color.R, color.G, color.B);
             }
+
+            [StructLayout(LayoutKind.Sequential)]
+            public struct Rect
+            {
+                public int Left;
+                public int Top;
+                public int Right;
+                public int Bottom;
+            }
+            [DllImport("user32.dll")]
+            public static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);
+            [DllImport("user32.dll")]
+            public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, int nFlags);
+
+            public static Bitmap GetWallpaperEngineImage()
+            {                
+                IntPtr MainHandle = new IntPtr(0x0002023E);
+
+                if (MainHandle.ToInt32() != 0)
+                {
+                    Rect rc;
+                    GetWindowRect(MainHandle, out rc);
+
+                    Bitmap bmp = new Bitmap(rc.Right - rc.Left, rc.Bottom - rc.Top, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                    Graphics gfxBmp = Graphics.FromImage(bmp);
+                    IntPtr hdcBitmap = gfxBmp.GetHdc();
+
+                    PrintWindow(MainHandle, hdcBitmap, 0x00000002);
+
+                    gfxBmp.ReleaseHdc(hdcBitmap);
+                    gfxBmp.Dispose();
+
+                    return bmp;
+                }
+                return null;
+            }
+
+            //@TODO Make this a octree based approach
+            //public static Color GetDominateColorFromImage(String path)
+            //{
+            //}
 
             const double minContrast = 2.33;
             public readonly Color[] SwatchPrimaryColors;
@@ -709,6 +699,7 @@ namespace MaterialPalette
             return colorToRainmeterString(Swatch.ColorSwatch.GetSafeTextColor(input));
         }
 
+
         internal override void Reload(IntPtr rm, ref double maxValue)
         {
             Rainmeter.API api = new Rainmeter.API(rm);
@@ -728,12 +719,20 @@ namespace MaterialPalette
                 //Replce spaces and underscores with blanks so it is easier for users
                 String source = api.ReadString("Source", null).Replace(" ", String.Empty).Replace("_", String.Empty);
                 String sourcePath = api.ReadPath("Source", "");
+                int accuracy = api.ReadInt("Accuracy", 10);
 
                 Swatch.SwatchNames currSwatchName;
                 //If it is a color name known
+                //@TODO this needs cleaned up and the options rethought out
                 if (Enum.TryParse<Swatch.SwatchNames>(source, out currSwatchName))
                 {
                     currSwatch = Swatch.ColorSwatches[(int)currSwatchName];
+                }
+                else if (source.ToLowerInvariant() == "wallpaper")
+                {
+                    Bitmap img = Swatch.ColorSwatch.GetWallpaperEngineImage();
+
+                    currSwatch = new Swatch.ColorSwatch(Swatch.ColorSwatch.GetDominateColorFromImageColorThief(img, accuracy), colorSafety);
                 }
                 else
                 {
@@ -742,7 +741,12 @@ namespace MaterialPalette
                     {
                         try
                         {
-                            currSwatch = new Swatch.ColorSwatch(Swatch.ColorSwatch.GetDominateColorFromImage(sourcePath), colorSafety);
+                            var bytes = File.ReadAllBytes(sourcePath);
+                            var ms = new MemoryStream(bytes);
+                            Bitmap img = (Bitmap)Image.FromStream(ms);
+                            //Bitmap img 
+
+                            currSwatch = new Swatch.ColorSwatch(Swatch.ColorSwatch.GetDominateColorFromImageColorThief(img, accuracy), colorSafety);
                         }
                         catch (Exception e)
                         {

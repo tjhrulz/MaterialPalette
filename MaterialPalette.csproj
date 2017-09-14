@@ -81,14 +81,18 @@
     <RunPostBuildEvent>Always</RunPostBuildEvent>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="ColorThief.Desktop.v46, Version=1.1.0.1, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\ksemenenko.ColorThief.1.1.0.3\lib\net46\ColorThief.Desktop.v46.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="API\ColorThief\CMap.cs" />
+    <Compile Include="API\ColorThief\Color.cs" />
+    <Compile Include="API\ColorThief\ColorThief.cs" />
+    <Compile Include="API\ColorThief\HslColor.cs" />
+    <Compile Include="API\ColorThief\Mmcq.cs" />
+    <Compile Include="API\ColorThief\QuantizedColor.cs" />
+    <Compile Include="API\ColorThief\VBox.cs" />
     <Compile Include="AssemblyInfo.cs" />
     <Compile Include="MaterialPalette.cs" />
     <Compile Include="$(SolutionDir).\API\RainmeterAPI.cs" />
