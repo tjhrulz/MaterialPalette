@@ -362,6 +362,9 @@ namespace MaterialPalette
             [DllImport("user32.dll")]
             public static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);
             [DllImport("user32.dll")]
+            public static extern bool MapWindowPoints(IntPtr hWndFrom, IntPtr hWndTo, ref Rect lpPoints, uint cPoints);
+
+            [DllImport("user32.dll")]
             public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, int nFlags);
 
             public static Bitmap GetWallpaperEngineImage()
@@ -382,6 +385,7 @@ namespace MaterialPalette
                     gfxBmp.ReleaseHdc(hdcBitmap);
                     gfxBmp.Dispose();
 
+                    //bmp.Save("asdf.bmp");
                     return bmp;
                 }
                 return null;
@@ -677,6 +681,14 @@ namespace MaterialPalette
         internal Swatch.ColorSwatch currSwatch;
         internal MeasureTypes type;
 
+        //If crop still needs done in update this will be true
+        internal bool doCrop = false;
+        //Bitmap of image to crop
+        internal Bitmap cropImg = null;
+        //Source of Swatch/Palette
+        internal String source = "";
+
+
         internal ParentMeasure(IntPtr rm)
         {
             ParentMeasures.Add(this);
@@ -713,52 +725,68 @@ namespace MaterialPalette
             {
                 type = MeasureTypes.Swatch;
 
-                //Replce spaces and underscores with blanks so it is easier for users
+                //If set P500 will be adjusted to ensure no duplicate colors
                 bool colorSafety = api.ReadInt("ColorSafe", 1) != 0 ? true : false;
-
                 //Replce spaces and underscores with blanks so it is easier for users
-                String source = api.ReadString("Source", null).Replace(" ", String.Empty).Replace("_", String.Empty);
+                //@TODO possibly convert to uppercase or something
+                source = api.ReadString("Source", null).Replace(" ", String.Empty).Replace("_", String.Empty);
+
+                //Path used if loading an image
                 String sourcePath = api.ReadPath("Source", "");
-                int accuracy = api.ReadInt("Accuracy", 10);
 
                 Swatch.SwatchNames currSwatchName;
                 //If it is a color name known
-                //@TODO this needs cleaned up and the options rethought out
                 if (Enum.TryParse<Swatch.SwatchNames>(source, out currSwatchName))
                 {
                     currSwatch = Swatch.ColorSwatches[(int)currSwatchName];
                 }
-                else if (source.ToLowerInvariant() == "wallpaper")
+                //Check if wallpaper or file loading
+                else if (source.Equals("wallpaper", StringComparison.InvariantCultureIgnoreCase) ||
+                    sourcePath.Length > 0 && System.IO.Directory.Exists(sourcePath.Substring(0, sourcePath.LastIndexOf('\\'))))
                 {
-                    Bitmap img = Swatch.ColorSwatch.GetWallpaperEngineImage();
+                    int accuracy = api.ReadInt("Accuracy", 10);
 
-                    currSwatch = new Swatch.ColorSwatch(Swatch.ColorSwatch.GetDominateColorFromImageColorThief(img, accuracy), colorSafety);
+                    //If there is a crop option flag to do crop later
+                    doCrop = api.ReadString("Crop", "").Length > 0 ? true : false;
+
+                    try
+                    {
+                        if (source.Equals("wallpaper", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            cropImg = Swatch.ColorSwatch.GetWallpaperEngineImage();
+                        }
+                        else
+                        {
+                            //Load image without locking it
+                            var bytes = File.ReadAllBytes(sourcePath);
+                            var ms = new MemoryStream(bytes);
+                            cropImg = (Bitmap)Image.FromStream(ms);
+                        }
+
+                        //If cropping we will need to wait till update cycle so we can get window size
+                        if (!doCrop)
+                        {
+                            currSwatch = new Swatch.ColorSwatch(Swatch.ColorSwatch.GetDominateColorFromImageColorThief(cropImg, accuracy), colorSafety);
+                        }
+                        else
+                        {
+                            //Set temporarily until a new swatch is made in update
+                            currSwatch = new Swatch.ColorSwatch();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        API.LogF(rm, API.LogType.Error, "Error generating swatch from file");
+                        API.Log(API.LogType.Debug, "Exception:" + e.ToString());
+
+                        //Fallback to all black
+                        currSwatch = new Swatch.ColorSwatch();
+                    }
                 }
                 else
                 {
-                    //If valid image path
-                    if (sourcePath.Length > 0 && System.IO.Directory.Exists(sourcePath.Substring(0, sourcePath.LastIndexOf('\\'))))
-                    {
-                        try
-                        {
-                            var bytes = File.ReadAllBytes(sourcePath);
-                            var ms = new MemoryStream(bytes);
-                            Bitmap img = (Bitmap)Image.FromStream(ms);
-                            //Bitmap img 
-
-                            currSwatch = new Swatch.ColorSwatch(Swatch.ColorSwatch.GetDominateColorFromImageColorThief(img, accuracy), colorSafety);
-                        }
-                        catch (Exception e)
-                        {
-                            API.LogF(rm, API.LogType.Error, "Error generating swatch from file");
-                            API.Log(API.LogType.Debug, "Exception:" + e.ToString());
-
-                            //Fallback to all black
-                            currSwatch = new Swatch.ColorSwatch();
-                        }
-                }
                     //If hex code
-                    else if (source.Contains("#") || !source.Contains(","))
+                    if (source.Contains("#") || !source.Contains(","))
                     {
                         try
                         {
@@ -811,6 +839,46 @@ namespace MaterialPalette
 
         internal override double Update()
         {
+            if (doCrop && cropImg != null)
+            {
+                try
+                {
+                    //Rainmeter.API api = new Rainmeter.API(lastKnownRM);
+                    //
+                    //String crop = api.ReadString("Crop", "");
+                    //
+                    ////Do crop for wallpaper
+                    //if (source.Equals("wallpaper", StringComparison.InvariantCultureIgnoreCase))
+                    //{
+                    //    //my window
+                    //    Swatch.ColorSwatch.Rect winRect;
+                    //    Swatch.ColorSwatch.GetWindowRect(api.GetSkinWindow(), out winRect);
+                    //
+                    //
+                    //    Rectangle rect = new Rectangle(winRect.Left, winRect.Top, winRect.Right - winRect.Left, winRect.Bottom - winRect.Top);
+                    //
+                    //    if (rect.Height > 0 && rect.Width > 0)
+                    //    {
+                    //        cropImg = cropImg.Clone(rect, cropImg.PixelFormat);
+                    //        cropImg.Save("crop.bmp");
+                    //        currSwatch = new Swatch.ColorSwatch(Swatch.ColorSwatch.GetDominateColorFromImageColorThief(cropImg, 10), true);
+                    //        doCrop = false;
+                    //    }
+                    //}
+                    ////Do crop for file
+                    //else
+                    //{
+                    //
+                    //}
+                }
+                catch (Exception e)
+                {
+                    API.LogF(lastKnownRM, API.LogType.Error, "Error cropping image, ignoring crop");
+                    API.Log(API.LogType.Debug, "Exception:" + e.ToString());
+
+                    doCrop = false;
+                }
+            }
             return 0.0;
         }
 
@@ -1080,8 +1148,8 @@ namespace MaterialPalette
         }
 
         [DllExport]
-        public static bool GetSafeColor(IntPtr data, [MarshalAs(UnmanagedType.LPWStr)] out string retValue, int argc, 
-            [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPWStr, SizeParamIndex = 2)] string[] argv)
+        public static IntPtr GetSafeColor(IntPtr data, int argc,
+            [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPWStr, SizeParamIndex = 1)] string[] argv)
         {
             Measure measure = (Measure)GCHandle.FromIntPtr(data).Target;
             
@@ -1091,13 +1159,7 @@ namespace MaterialPalette
                 {
                     Color input = Color.FromArgb(Convert.ToInt16(argv[0]), Convert.ToInt16(argv[1]), Convert.ToInt16(argv[2]));
 
-                    retValue = measure.GetSafeTextColor(input);
-                    //If color returned was bad
-                    if(retValue == null)
-                    {
-                        return false;
-                    }
-                    return true;
+                    return Marshal.StringToHGlobalUni(measure.GetSafeTextColor(input));
                 }
                 catch (Exception e)
                 {
@@ -1108,17 +1170,10 @@ namespace MaterialPalette
             //@TODO add hexcode support
             else
             {
-                retValue = measure.GetSafeTextColor();
-                //If color returned was bad
-                if (retValue == null)
-                {
-                    return false;
-                }
-                return true;
+                return Marshal.StringToHGlobalUni(measure.GetSafeTextColor());
             }
-
-            retValue = "";
-            return false;
+            
+            return IntPtr.Zero;
         }
     }
 }
